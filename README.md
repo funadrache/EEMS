@@ -1,5 +1,6 @@
 # EEMS
 Entrance and exit management system
 
-jikanfunc.py
-  A sample for function strftime()
+- jikanfunc.py
+  - A sample for function strftime()
+

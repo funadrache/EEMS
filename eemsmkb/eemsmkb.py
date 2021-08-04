@@ -13,6 +13,7 @@ from kivy.app import App
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.popup import Popup
 
 from kivy.core.text import LabelBase, DEFAULT_FONT
@@ -38,6 +39,7 @@ tmpOrg = 0
 tmpOrgAndName = ''
 presentMember = ['' for i in range(0)]
 orgLabelText = 'あなたの所属を選択してください'
+warningMessage = ''
 
 # 所属集団のリスト
 orgFile = open('organization.txt', 'r')
@@ -185,24 +187,68 @@ class EemsApp(App):
         popup = Popup(title = tmpOrgAndName + 'さん入室ですか退室ですか？', content = layout)
         popup.open()
 
-        enterButton.bind(on_press = self.clickbuttonEnterRoom)
+        enterButton.bind(on_press = self.AreYouSureToEntrance)
         enterButton.bind(on_press = popup.dismiss)
-        exitButton.bind(on_press = self.clickbuttonExitRoom)
+        exitButton.bind(on_press = self.AreYouSureToExit)
         exitButton.bind(on_press = popup.dismiss)
 
         # Attach close button press with popup.dismiss action
         closeButton.bind(on_press = popup.dismiss)
 
+    def AreYouSureToEntrance(self, button):
+        
+        layout = BoxLayout(orientation = 'vertical', padding = 10)
+        enterLabel = Label(text = '「' + tmpOrgAndName + '」さん\n入室でよろしいですか？', font_size='28pt')
+        layout.add_widget(enterLabel)
+
+#        layoutButton = BoxLayout(orientation = 'horizontal', padding = 10)
+        yesButton = Button(text = 'はい', font_size='28pt', size_hint_y=0.5)
+        layout.add_widget(yesButton) 
+        noButton = Button(text = 'いいえ', font_size='28pt', size_hint_y=0.5)
+        layout.add_widget(noButton) 
+
+        # Instantiate the modal popup and display
+        popup = Popup(title = '入室確認', content = layout)
+        popup.open()
+
+        yesButton.bind(on_press = self.clickbuttonEnterRoom)
+        yesButton.bind(on_press = popup.dismiss)
+        noButton.bind(on_press = popup.dismiss)
+
+    def AreYouSureToExit(self, button):
+        
+        layout = BoxLayout(orientation = 'vertical', padding = 10)
+        exitLabel = Label(text = '「' + tmpOrgAndName + '」さん\n退室でよろしいですか？', font_size='28pt')
+        layout.add_widget(exitLabel)
+
+#        layoutButton = BoxLayout(orientation = 'horizontal', padding = 10)
+        yesButton = Button(text = 'はい', font_size='28pt', size_hint_y=0.5)
+        layout.add_widget(yesButton) 
+        noButton = Button(text = 'いいえ', font_size='28pt', size_hint_y=0.5)
+        layout.add_widget(noButton) 
+
+        # Instantiate the modal popup and display
+        popup = Popup(title = '退室確認', content = layout)
+        popup.open()
+
+        yesButton.bind(on_press = self.clickbuttonExitRoom)
+        yesButton.bind(on_press = popup.dismiss)
+        noButton.bind(on_press = popup.dismiss)
+
     def clickbuttonEnterRoom(self, button):
+        global warningMessage
         if tmpOrgAndName in presentMember:
+            warningMessage = '「' + tmpOrgAndName + '」さんは\nすでに入室しています'
+            self.warningPopup()
             return
         presentMember.append(tmpOrgAndName)
-        print(presentMember)
+        print('現在の在室者リストは' + str(presentMember))
         dtNow = datetime.datetime.now()
         response = clientLog.chat_postMessage(
               channel=LoggingChannel,
               text = organization[tmpOrg] + ' の ' + tmpOrgAndName + ' が入室した' \
-                + dtNow.strftime('日付と時刻は %Y年%m月%d日%H時%M分%S秒です。'),
+                + dtNow.strftime('日付と時刻は %Y年%m月%d日%H時%M分%S秒です。\n') \
+                + '現在の在室者リストは' + str(presentMember),
         )
         record_string = organization[tmpOrg] + ',' + tmpOrgAndName + ',enter,' + dateTimeStr(dtNow, ',')
         print(record_string)
@@ -210,16 +256,20 @@ class EemsApp(App):
         f.flush()
 
     def clickbuttonExitRoom(self, button):
+        global warningMessage
         if tmpOrgAndName in presentMember:
             presentMember.remove(tmpOrgAndName)
         else:
+            warningMessage = '「' + tmpOrgAndName + '」さんは\nすでに退室しています'
+            self.warningPopup()
             return
-        print(presentMember)
+        print('現在の在室者リストは' + str(presentMember))
         dtNow = datetime.datetime.now()
         response = clientLog.chat_postMessage(
               channel=LoggingChannel,
               text = organization[tmpOrg] + ' の ' + tmpOrgAndName + ' が退室した' \
-                + dtNow.strftime('日付と時刻は %Y年%m月%d日%H時%M分%S秒です。'),
+                + dtNow.strftime('日付と時刻は %Y年%m月%d日%H時%M分%S秒です。\n') \
+                + '現在の在室者リストは' + str(presentMember),
         )
         record_string = organization[tmpOrg] + ',' + tmpOrgAndName + ',exit,' + dateTimeStr(dtNow, ',')
         print(record_string)
@@ -227,9 +277,19 @@ class EemsApp(App):
         f.flush()
 
 # 最後の退出者への注意喚起
-        print('在室者リストの長さは' + str(len(presentMember)))
+#        print('在室者リストの長さは' + str(len(presentMember)))
         if len(presentMember) == 0:
             self.lastExitMessage()
+
+    def warningPopup(self):
+        layout = BoxLayout(orientation = 'vertical', padding = 10)
+        warningLabel = Label(text = warningMessage, font_size='28pt')
+        layout.add_widget(warningLabel)
+        yesButton = Button(text = '確認', font_size='28pt', size_hint_y=0.5)
+        layout.add_widget(yesButton)
+        popup = Popup(title = 'Warning', content = layout)
+        popup.open()
+        yesButton.bind(on_press = popup.dismiss)
 
     def lastExitMessage(self):
         layout = GridLayout(cols = 1, padding = 10)

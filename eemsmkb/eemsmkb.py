@@ -31,8 +31,8 @@ clientLog = WebClient(os.environ['SLACK_LOG_TOKEN'])
 clientUpload = WebClient(os.environ['SLACK_UPLOAD_TOKEN'])
 
 # Set Bot Channels
-LoggingChannel = '#bot-test'
-UploadChannel = '#logupload'
+LoggingChannel = '#logging'
+UploadChannel = '#upload'
 
 # Global変数
 tmpOrg = 0
@@ -65,14 +65,34 @@ print(orgAndName)
 # Open Log file and Start Logging
 dtFile = datetime.datetime.now()
 logFileName = dateTimeStr(dtFile, '-') + '.csv'
-f = open(logFileName, 'w')
+logFile = open(logFileName, 'w')
 print('[Start logging] File = ' + logFileName)
+#logFile.write('組織,名前,入退室,年,月,日,時,分,秒,マイクロ秒\n')
 
 dtNow = datetime.datetime.now()
 response = clientLog.chat_postMessage(
     channel=LoggingChannel,
     text='■■■ロギングを開始しました。' \
        + dtNow.strftime('日付と時刻は %Y年%m月%d日%H時%M分%S秒です。'),
+)
+
+# 在室者リストのファイル、無ければ作成、あれば内容をロード 
+listFileName = 'PersonsInRoom.txt'
+if(os.path.exists(listFileName)):
+    filePersonsInRoom = open(listFileName, 'r')
+    presentMember = filePersonsInRoom.readlines()
+    for index, item in enumerate(presentMember):
+        presentMember[index] = presentMember[index].rstrip('\n')
+    filePersonsInRoom.close()
+    filePersonsInRoom = open(listFileName, 'w')
+else:
+    filePersonsInRoom = open(listFileName, 'w')
+
+# 開始時の在室者一覧をprintしSlackに報告
+print('プログラムスタート時の在室者のリストは ' + str(presentMember))
+response = clientLog.chat_postMessage(
+    channel=LoggingChannel,
+    text='プログラムスタート時の在室者のリストは ' + str(presentMember),
 )
 
 class EemsApp(App):
@@ -252,8 +272,8 @@ class EemsApp(App):
         )
         record_string = organization[tmpOrg] + ',' + tmpOrgAndName + ',enter,' + dateTimeStr(dtNow, ',')
         print(record_string)
-        f.write(record_string + '\n')
-        f.flush()
+        logFile.write(record_string + '\n')
+        logFile.flush()
 
     def clickbuttonExitRoom(self, button):
         global warningMessage
@@ -273,8 +293,8 @@ class EemsApp(App):
         )
         record_string = organization[tmpOrg] + ',' + tmpOrgAndName + ',exit,' + dateTimeStr(dtNow, ',')
         print(record_string)
-        f.write(record_string + '\n')
-        f.flush()
+        logFile.write(record_string + '\n')
+        logFile.flush()
 
 # 最後の退出者への注意喚起
 #        print('在室者リストの長さは' + str(len(presentMember)))
@@ -311,8 +331,19 @@ class EemsApp(App):
 if __name__ == '__main__':
     EemsApp().run()
 
+# プログラム停止時に在室者リストをファイルに保存
+response = clientLog.chat_postMessage(
+    channel=LoggingChannel,
+    text='プログラム停止時の在室者のリストは ' + str(presentMember),
+)
+print('プログラム終了時の在室者のリストは ' + str(presentMember))
+for tmpName in presentMember:
+    filePersonsInRoom.write(tmpName+'\n')
+filePersonsInRoom.close()
+
 # Upload Logfile when leaving application
-f.close()
+logFile.close()
 response = clientUpload.files_upload(channels=UploadChannel, file=logFileName)
 print('[Logfile] ' + logFileName + ' uploaded.')
+
 
